@@ -1,0 +1,302 @@
+[
+  {
+    "version": "V0",
+    "text": "нагода сегодня хорошая",
+    "response": "{'На годе сегодня хорошо': 'На годе сегодня хороший'}",
+    "changes": "",
+    "time_ms": 19500,
+    "is_fixed": false,
+    "is_json": true,
+    "success": true
+  },
+  {
+    "version": "V0",
+    "text": "я пашел в магазин",
+    "response": "{'Я ходил в магазин.': 'I went to the store.'}",
+    "changes": "",
+    "time_ms": 1198,
+    "is_fixed": false,
+    "is_json": true,
+    "success": true
+  },
+  {
+    "version": "V0",
+    "text": "малако вкусное",
+    "response": "{'Малако вкусное': 'Мальако вкусно'}",
+    "changes": "",
+    "time_ms": 1296,
+    "is_fixed": false,
+    "is_json": true,
+    "success": true
+  },
+  {
+    "version": "V0",
+    "text": "Искуственный интелект",
+    "response": "{'Искуственный интеллект': 'Искусственный интеллект'}",
+    "changes": "",
+    "time_ms": 1248,
+    "is_fixed": true,
+    "is_json": true,
+    "success": true
+  },
+  {
+    "version": "V0",
+    "text": "севодня отличный день",
+    "response": "{'original_text': 'севодня отличный день', 'corrected_text': 'сегодня отличное утро'}",
+    "changes": "",
+    "time_ms": 1859,
+    "is_fixed": true,
+    "is_json": true,
+    "success": true
+  },
+  {
+    "version": "V1",
+    "text": "нагода сегодня хорошая",
+    "response": "нагота сегодня хорошая",
+    "changes": "",
+    "time_ms": 1331,
+    "is_fixed": false,
+    "is_json": false,
+    "success": true
+  },
+  {
+    "version": "V1",
+    "text": "я пашел в магазин",
+    "response": "я ходил в магазин",
+    "changes": "",
+    "time_ms": 1186,
+    "is_fixed": false,
+    "is_json": false,
+    "success": true
+  },
+  {
+    "version": "V1",
+    "text": "малако вкусное",
+    "response": "мало вкусное",
+    "changes": "",
+    "time_ms": 1042,
+    "is_fixed": false,
+    "is_json": false,
+    "success": true
+  },
+  {
+    "version": "V1",
+    "text": "Искуственный интелект",
+    "response": "искусственный интеллект",
+    "changes": "",
+    "time_ms": 1136,
+    "is_fixed": false,
+    "is_json": false,
+    "success": true
+  },
+  {
+    "version": "V1",
+    "text": "севодня отличный день",
+    "response": "сегодня отличное день",
+    "changes": "",
+    "time_ms": 1229,
+    "is_fixed": true,
+    "is_json": false,
+    "success": true
+  },
+  {
+    "version": "V2",
+    "text": "нагода сегодня хорошая",
+    "response": "нагота сегодня хороша",
+    "changes": "",
+    "time_ms": 1402,
+    "is_fixed": false,
+    "is_json": false,
+    "success": true
+  },
+  {
+    "version": "V2",
+    "text": "я пашел в магазин",
+    "response": "я ходил в магазин",
+    "changes": "",
+    "time_ms": 1196,
+    "is_fixed": false,
+    "is_json": false,
+    "success": true
+  },
+  {
+    "version": "V2",
+    "text": "малако вкусное",
+    "response": "малоарочно вкусное",
+    "changes": "",
+    "time_ms": 1196,
+    "is_fixed": false,
+    "is_json": false,
+    "success": true
+  },
+  {
+    "version": "V2",
+    "text": "Искуственный интелект",
+    "response": "искусственный интеллект",
+    "changes": "",
+    "time_ms": 1141,
+    "is_fixed": false,
+    "is_json": false,
+    "success": true
+  },
+  {
+    "version": "V2",
+    "text": "севодня отличный день",
+    "response": "сегодня отличное время",
+    "changes": "",
+    "time_ms": 1184,
+    "is_fixed": true,
+    "is_json": false,
+    "success": true
+  },
+  {
+    "version": "V3",
+    "text": "нагода сегодня хорошая",
+    "response": "нагота сегодня хороша",
+    "changes": "нагода->нагота",
+    "time_ms": 2212,
+    "is_fixed": false,
+    "is_json": false,
+    "success": true
+  },
+  {
+    "version": "V3",
+    "text": "я пашел в магазин",
+    "response": "я пошел в магазин",
+    "changes": "пашел->пошел",
+    "time_ms": 1713,
+    "is_fixed": true,
+    "is_json": false,
+    "success": true
+  },
+  {
+    "version": "V3",
+    "text": "малако вкусное",
+    "response": "малоко вкусно",
+    "changes": "малако->малоко",
+    "time_ms": 1608,
+    "is_fixed": false,
+    "is_json": false,
+    "success": true
+  },
+  {
+    "version": "V3",
+    "text": "Искуственный интелект",
+    "response": "Искусственный интеллект",
+    "changes": "",
+    "time_ms": 1346,
+    "is_fixed": true,
+    "is_json": false,
+    "success": true
+  },
+  {
+    "version": "V3",
+    "text": "севодня отличный день",
+    "response": "сегодня отличною днём",
+    "changes": "севодня->сегодня, день->днём",
+    "time_ms": 2197,
+    "is_fixed": true,
+    "is_json": false,
+    "success": true
+  },
+  {
+    "version": "V4",
+    "text": "нагода сегодня хорошая",
+    "response": "нагота сегодня хорошая",
+    "changes": "замена ошибки на правильное написание слова 'нагота' (без буквы 'д')",
+    "time_ms": 3454,
+    "is_fixed": false,
+    "is_json": false,
+    "success": true
+  },
+  {
+    "version": "V4",
+    "text": "я пашел в магазин",
+    "response": "я ходил в магазин",
+    "changes": "изменил глагол на форму прошедшего времени, исправил орфографическую ошибку",
+    "time_ms": 2878,
+    "is_fixed": false,
+    "is_json": false,
+    "success": true
+  },
+  {
+    "version": "V4",
+    "text": "малако вкусное",
+    "response": "малоко вкусное",
+    "changes": "добавлена запятая после числительного",
+    "time_ms": 2191,
+    "is_fixed": false,
+    "is_json": false,
+    "success": true
+  },
+  {
+    "version": "V4",
+    "text": "Искуственный интелект",
+    "response": "Искусственный интеллект",
+    "changes": "",
+    "time_ms": 1516,
+    "is_fixed": true,
+    "is_json": false,
+    "success": true
+  },
+  {
+    "version": "V4",
+    "text": "севодня отличный день",
+    "response": "сегодня отличное время",
+    "changes": "изменение на 'сегодня' и 'отличное время'",
+    "time_ms": 2462,
+    "is_fixed": true,
+    "is_json": false,
+    "success": true
+  },
+  {
+    "version": "V5",
+    "text": "нагода сегодня хорошая",
+    "response": "нагота сегодня хорошая",
+    "changes": "исправил орфографическую ошибку в слове 'нагода' на 'нагота'",
+    "time_ms": 3033,
+    "is_fixed": false,
+    "is_json": false,
+    "success": true
+  },
+  {
+    "version": "V5",
+    "text": "я пашел в магазин",
+    "response": "я ходил в магазин",
+    "changes": "заменил глагол 'пашел' на 'ходил', потому что корректное написание - 'ходить' для действия, связанно",
+    "time_ms": 3725,
+    "is_fixed": false,
+    "is_json": false,
+    "success": true
+  },
+  {
+    "version": "V5",
+    "text": "малако вкусное",
+    "response": "малая ко вкусное",
+    "changes": "добавление пробелов и исправление наклонения глагола",
+    "time_ms": 2351,
+    "is_fixed": false,
+    "is_json": false,
+    "success": true
+  },
+  {
+    "version": "V5",
+    "text": "Искуственный интелект",
+    "response": "Искусственный интеллект",
+    "changes": "",
+    "time_ms": 1516,
+    "is_fixed": true,
+    "is_json": false,
+    "success": true
+  },
+  {
+    "version": "V5",
+    "text": "севодня отличный день",
+    "response": "сегодня отличный день",
+    "changes": "добавление согласовательного союза 'сегодня' и запятой в конце предложения",
+    "time_ms": 2993,
+    "is_fixed": true,
+    "is_json": false,
+    "success": true
+  }
+]
