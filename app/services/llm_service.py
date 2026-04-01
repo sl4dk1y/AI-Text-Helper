@@ -1,5 +1,7 @@
 import json
 import httpx
+import time
+from datetime import datetime
 from ..core.config import settings
 from ..models.schemas import ImprovedTextResponse, SummaryResponse
 import logging
@@ -100,13 +102,20 @@ class LLMService:
     async def improve_text(self, text: str, instruction: str) -> ImprovedTextResponse:
         """Улучшение текста с применением лучших практик промпт-инжиниринга"""
 
+        start_time = time.time()
+
         if text == "string" or text == "":
             logger.info("Получены тестовые данные, возвращаю как есть")
             return ImprovedTextResponse(
                 original_text=text,
                 improved_text=text,
                 applied_instruction=instruction,
-                changes_made="Тестовый запрос"
+                changes_made="Тестовый запрос",
+                model_name=self.model,
+                temperature=self.temperature,
+                processing_time_ms=0,
+                timestamp=datetime.now(),
+                tokens_used=None
             )
 
         prompt = f"""
@@ -157,6 +166,8 @@ class LLMService:
             logger.info(f"Отправка запроса на исправление текста: {text[:50]}...")
             result = await self._make_request(prompt, temperature=0.3)
 
+            processing_time_ms = int((time.time() - start_time) * 1000)
+
             improved = result.get("improved_text", result.get("text", text))
             changes_raw = result.get("changes_made", result.get("changes", "Исправления выполнены"))
             if isinstance(changes_raw, list):
@@ -168,14 +179,22 @@ class LLMService:
                 original_text=text,
                 improved_text=improved,
                 applied_instruction=instruction,
-                changes_made=changes
+                changes_made=changes,
+                model_name=self.model,
+                temperature=self.temperature,
+                processing_time_ms=processing_time_ms,
+                timestamp=datetime.now(),
+                tokens_used=None
             )
         except Exception as e:
             logger.error(f"Ошибка improve_text: {e}")
-            return await self.improve_text_fallback(text, instruction)
+            return await self.improve_text_fallback(text, instruction, start_time)
 
-    async def improve_text_fallback(self, text: str, instruction: str) -> ImprovedTextResponse:
+    async def improve_text_fallback(self, text: str, instruction: str, start_time: float = None) -> ImprovedTextResponse:
         """Запасной метод для улучшения текста"""
+
+        if start_time is None:
+            start_time = time.time()
 
         prompt = f"""
         # ЗАДАЧА
@@ -198,23 +217,40 @@ class LLMService:
 
         try:
             result = await self._make_request(prompt, temperature=0.5)
+
+            processing_time_ms = int((time.time() - start_time) * 1000)
+
             return ImprovedTextResponse(
                 original_text=text,
                 improved_text=result.get("improved_text", result.get("text", text)),
                 applied_instruction=instruction,
-                changes_made=result.get("changes_made", "Исправления выполнены")
+                changes_made=result.get("changes_made", "Исправления выполнены"),
+                model_name=self.model,
+                temperature=0.5,
+                processing_time_ms=processing_time_ms,
+                timestamp=datetime.now(),
+                tokens_used=None
             )
         except Exception as e:
             logger.error(f"Ошибка в fallback методе: {e}")
+            processing_time_ms = int((time.time() - start_time) * 1000)
+
             return ImprovedTextResponse(
                 original_text=text,
                 improved_text=text,
                 applied_instruction=instruction,
-                changes_made="Не удалось обработать текст"
+                changes_made="Не удалось обработать текст",
+                model_name=self.model,
+                temperature=self.temperature,
+                processing_time_ms=processing_time_ms,
+                timestamp=datetime.now(),
+                tokens_used=None
             )
 
     async def summarize(self, text: str) -> SummaryResponse:
         """Суммаризация текста с применением лучших практик промпт-инжиниринга"""
+
+        start_time = time.time()
 
         prompt = f"""
         # ЗАДАЧА
@@ -256,12 +292,31 @@ class LLMService:
         try:
             result = await self._make_request(prompt, temperature=0.3)
 
+            processing_time_ms = int((time.time() - start_time) * 1000)
+
             return SummaryResponse(
                 summary=result.get("summary", result.get("text", "")),
                 keywords=result.get("keywords", []),
                 original_length=len(text),
-                summary_length=len(result.get("summary", result.get("text", "")))
+                summary_length=len(result.get("summary", result.get("text", ""))),
+                model_name=self.model,
+                temperature=0.3,
+                processing_time_ms=processing_time_ms,
+                timestamp=datetime.now(),
+                tokens_used=None
             )
         except Exception as e:
             logger.error(f"Ошибка summarize: {e}")
-            raise
+            processing_time_ms = int((time.time() - start_time) * 1000)
+
+            return SummaryResponse(
+                summary="",
+                keywords=[],
+                original_length=len(text),
+                summary_length=0,
+                model_name=self.model,
+                temperature=0.3,
+                processing_time_ms=processing_time_ms,
+                timestamp=datetime.now(),
+                tokens_used=None
+            )
