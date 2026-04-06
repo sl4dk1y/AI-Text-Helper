@@ -1,0 +1,21 @@
+{
+  "queries": [
+    {"id": "q1", "text": "нагода"},
+    {"id": "q2", "text": "пашел"},
+    {"id": "q3", "text": "малако"},
+    {"id": "q4", "text": "севодня"},
+    {"id": "q5", "text": "нормальное слово"},
+    {"id": "q6", "text": "нагода сегодня хорошая"},
+    {"id": "q7", "text": "я пашел в магазин"},
+    {"id": "q8", "text": "малако вкусное"}
+  ],
+  "qrels": [
+    {"query_id": "q1", "doc_id": "нагода", "relevance": 2},
+    {"query_id": "q2", "doc_id": "пашел", "relevance": 2},
+    {"query_id": "q3", "doc_id": "малако", "relevance": 2},
+    {"query_id": "q4", "doc_id": "севодня", "relevance": 2},
+    {"query_id": "q6", "doc_id": "нагода", "relevance": 2},
+    {"query_id": "q7", "doc_id": "пашел", "relevance": 2},
+    {"query_id": "q8", "doc_id": "малако", "relevance": 2}
+  ]
+}
