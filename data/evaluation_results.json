@@ -1,0 +1,73 @@
+{
+  "timestamp": "2026-04-06T19:57:19.768061",
+  "total_queries": 8,
+  "avg_precision_at_1": 0.875,
+  "avg_recall_at_5": 0.875,
+  "avg_mrr_at_5": 0.875,
+  "detailed_results": [
+    {
+      "query_id": "q1",
+      "query_text": "нагода",
+      "precision_at_1": 1.0,
+      "recall_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "num_results": 1
+    },
+    {
+      "query_id": "q2",
+      "query_text": "пашел",
+      "precision_at_1": 1.0,
+      "recall_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "num_results": 1
+    },
+    {
+      "query_id": "q3",
+      "query_text": "малако",
+      "precision_at_1": 1.0,
+      "recall_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "num_results": 1
+    },
+    {
+      "query_id": "q4",
+      "query_text": "севодня",
+      "precision_at_1": 1.0,
+      "recall_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "num_results": 1
+    },
+    {
+      "query_id": "q5",
+      "query_text": "нормальное слово",
+      "precision_at_1": 0.0,
+      "recall_at_5": 0.0,
+      "mrr_at_5": 0.0,
+      "num_results": 0
+    },
+    {
+      "query_id": "q6",
+      "query_text": "нагода сегодня хорошая",
+      "precision_at_1": 1.0,
+      "recall_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "num_results": 3
+    },
+    {
+      "query_id": "q7",
+      "query_text": "я пашел в магазин",
+      "precision_at_1": 1.0,
+      "recall_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "num_results": 1
+    },
+    {
+      "query_id": "q8",
+      "query_text": "малако вкусное",
+      "precision_at_1": 1.0,
+      "recall_at_5": 1.0,
+      "mrr_at_5": 1.0,
+      "num_results": 1
+    }
+  ]
+}
