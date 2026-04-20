@@ -47,7 +47,7 @@ class LLMService:
             "messages": [
                 {
                     "role": "system",
-                    "content": "Ты - эксперт по русскому языку. Исправляй орфографические и грамматические ошибки в тексте. Сохраняй смысл."
+                    "content": "Ты - эксперт по русскому языку. Исправляй орфографические и грамматические ошибки в тексте. Сохраняй смысл. Перед ответом подумай и запиши свои рассуждения в поле reasoning."
                 },
                 {
                     "role": "user",
@@ -109,7 +109,7 @@ class LLMService:
             raise
 
     async def improve_text(self, text: str, instruction: str) -> ImprovedTextResponse:
-        """Улучшение текста с использованием ретривера"""
+        """Улучшение текста с использованием ретривера и Schema-Guided Reasoning"""
 
         start_time = time.time()
 
@@ -120,6 +120,7 @@ class LLMService:
                 improved_text=text,
                 applied_instruction=instruction,
                 changes_made="Тестовый запрос",
+                reasoning="Тестовый запрос, обработка не требуется.",
                 model_name=self.model,
                 temperature=self.temperature,
                 processing_time_ms=0,
@@ -141,11 +142,27 @@ class LLMService:
                 retrieved_context = f"Известные исправления: {', '.join(corrections)}"
                 logger.info(f"Ретривер нашёл: {retrieved_context}")
 
-        # 2. Формирование промпта с учётом контекста ретривера
-        if retrieved_context:
-            prompt = f"""
+        # 2. Формирование промпта с учётом контекста ретривера и требованием reasoning
+        base_prompt = """
 # ЗАДАЧА
 Ты — профессиональный редактор русского языка. Исправь ошибки в тексте.
+
+# ПРАВИЛА
+1. Проанализируй текст и найди орфографические и грамматические ошибки
+2. Запиши свои рассуждения в поле reasoning (что ты нашёл, почему решил исправить именно так)
+3. Исправь найденные ошибки
+4. Составь список исправлений
+
+# ФОРМАТ ОТВЕТА
+Верни JSON с четырьмя полями:
+- reasoning: твои рассуждения о том, какие ошибки ты нашёл и почему их исправил именно так
+- improved_text: исправленный текст целиком
+- changes_made: список исправлений через запятую
+"""
+
+        if retrieved_context:
+            prompt = f"""
+{base_prompt}
 
 # БАЗА ЗНАНИЙ (найденные соответствия)
 {retrieved_context}
@@ -158,16 +175,16 @@ class LLMService:
 # ИНСТРУКЦИЯ
 {instruction}
 
-# ФОРМАТ ОТВЕТА
+# ПРИМЕР ФОРМАТА
 {{
-    "improved_text": "исправленный текст целиком",
-    "changes_made": "список исправлений через запятую"
+    "reasoning": "Я проанализировал текст. Слово 'нагода' не существует в русском языке. Ближайшее по смыслу и звучанию — 'погода'. Остальные слова написаны правильно.",
+    "improved_text": "погода сегодня хорошая",
+    "changes_made": "нагода->погода"
 }}
 """
         else:
             prompt = f"""
-# ЗАДАЧА
-Ты — профессиональный редактор русского языка. Исправь ошибки в тексте.
+{base_prompt}
 
 # ИСХОДНЫЕ ДАННЫЕ
 --- НАЧАЛО ТЕКСТА ---
@@ -177,10 +194,11 @@ class LLMService:
 # ИНСТРУКЦИЯ
 {instruction}
 
-# ФОРМАТ ОТВЕТА
+# ПРИМЕР ФОРМАТА
 {{
-    "improved_text": "исправленный текст целиком",
-    "changes_made": "список исправлений через запятую"
+    "reasoning": "Я проанализировал текст. Слово 'нагода' не существует в русском языке. Ближайшее по смыслу и звучанию — 'погода'. Остальные слова написаны правильно.",
+    "improved_text": "погода сегодня хорошая",
+    "changes_made": "нагода->погода"
 }}
 """
 
@@ -190,8 +208,11 @@ class LLMService:
 
             processing_time_ms = int((time.time() - start_time) * 1000)
 
+            # Извлекаем данные из ответа
+            reasoning = result.get("reasoning", "Рассуждения не предоставлены")
             improved = result.get("improved_text", result.get("text", text))
             changes_raw = result.get("changes_made", result.get("changes", "Исправления выполнены"))
+            
             if isinstance(changes_raw, list):
                 changes = ", ".join(changes_raw)
             else:
@@ -202,6 +223,7 @@ class LLMService:
                 improved_text=improved,
                 applied_instruction=instruction,
                 changes_made=changes,
+                reasoning=reasoning,
                 model_name=self.model,
                 temperature=self.temperature,
                 processing_time_ms=processing_time_ms,
@@ -213,7 +235,7 @@ class LLMService:
             return await self.improve_text_fallback(text, instruction, start_time)
 
     async def improve_text_fallback(self, text: str, instruction: str, start_time: float = None) -> ImprovedTextResponse:
-        """Запасной метод для улучшения текста"""
+        """Запасной метод для улучшения текста с reasoning"""
 
         if start_time is None:
             start_time = time.time()
@@ -231,46 +253,39 @@ class LLMService:
             if corrections:
                 retrieved_context = f"Известные исправления: {', '.join(corrections)}"
 
-        if retrieved_context:
-            prompt = f"""
+        base_prompt = """
 # ЗАДАЧА
 Ты — редактор русского языка. Исправь ошибки в тексте.
+
+# ФОРМАТ ОТВЕТА
+Верни JSON с четырьмя полями:
+- reasoning: твои рассуждения
+- improved_text: исправленный текст
+- changes_made: что исправлено
+"""
+
+        if retrieved_context:
+            prompt = f"""
+{base_prompt}
 
 # БАЗА ЗНАНИЙ (найденные соответствия)
 {retrieved_context}
 
-# ИСХОДНЫЕ ДАННЫЕ
---- НАЧАЛО ТЕКСТА ---
+# ТЕКСТ
 {text}
---- КОНЕЦ ТЕКСТА ---
 
 # ИНСТРУКЦИЯ
 {instruction}
-
-# ФОРМАТ ОТВЕТА
-{{
-    "improved_text": "исправленный текст",
-    "changes_made": "что исправлено"
-}}
 """
         else:
             prompt = f"""
-# ЗАДАЧА
-Ты — редактор русского языка. Исправь ошибки в тексте.
+{base_prompt}
 
-# ИСХОДНЫЕ ДАННЫЕ
---- НАЧАЛО ТЕКСТА ---
+# ТЕКСТ
 {text}
---- КОНЕЦ ТЕКСТА ---
 
 # ИНСТРУКЦИЯ
 {instruction}
-
-# ФОРМАТ ОТВЕТА
-{{
-    "improved_text": "исправленный текст",
-    "changes_made": "что исправлено"
-}}
 """
 
         try:
@@ -278,11 +293,14 @@ class LLMService:
 
             processing_time_ms = int((time.time() - start_time) * 1000)
 
+            reasoning = result.get("reasoning", "Рассуждения не предоставлены")
+
             return ImprovedTextResponse(
                 original_text=text,
                 improved_text=result.get("improved_text", result.get("text", text)),
                 applied_instruction=instruction,
                 changes_made=result.get("changes_made", "Исправления выполнены"),
+                reasoning=reasoning,
                 model_name=self.model,
                 temperature=0.5,
                 processing_time_ms=processing_time_ms,
@@ -298,6 +316,7 @@ class LLMService:
                 improved_text=text,
                 applied_instruction=instruction,
                 changes_made="Не удалось обработать текст",
+                reasoning=f"Произошла ошибка при обработке: {str(e)}",
                 model_name=self.model,
                 temperature=self.temperature,
                 processing_time_ms=processing_time_ms,
@@ -306,57 +325,50 @@ class LLMService:
             )
 
     async def summarize(self, text: str) -> SummaryResponse:
-        """Суммаризация текста с применением лучших практик промпт-инжиниринга"""
+        """Суммаризация текста с Schema-Guided Reasoning"""
 
         start_time = time.time()
 
         prompt = f"""
-    # ЗАДАЧА
-    Ты — профессиональный редактор и аналитик. Твоя задача — создавать краткое содержание текста и выделять ключевые слова.
+# ЗАДАЧА
+Ты — профессиональный редактор и аналитик. Создай краткое содержание текста.
 
-    # КОНТЕКСТ
-    Пользователь отправляет длинный текст. Нужно:
-    - Сократить текст, сохранив основную мысль
-    - Выделить 3-5 ключевых слов
-    - Сохранить язык оригинала
+# ПРАВИЛА
+1. Прочитай текст и определи главную тему
+2. Запиши свои рассуждения в поле reasoning (что ты выделил как главное, почему)
+3. Сформулируй краткое содержание
+4. Выдели 3-5 ключевых слов
 
-    # ИСХОДНЫЕ ДАННЫЕ
-    --- НАЧАЛО ТЕКСТА ---
-    {text}
-    --- КОНЕЦ ТЕКСТА ---
+# ФОРМАТ ОТВЕТА
+Верни JSON с тремя полями:
+- reasoning: твои рассуждения о том, что является главной мыслью текста
+- summary: краткое содержание (2-4 предложения)
+- keywords: список ключевых слов
 
-    # АЛГОРИТМ ДЕЙСТВИЙ
-    1. Прочитай текст и определи главную тему
-    2. Выдели основные мысли (обычно 1-3 предложения)
-    3. Сформулируй краткое содержание своими словами
-    4. Выдели 3-5 ключевых слов, отражающих суть текста
-    5. Убедись, что ключевые слова на том же языке, что и текст
+# ТЕКСТ
+{text}
 
-    # ФОРМАТ ОТВЕТА
-    Ответ должен быть строго в формате JSON. Никакого дополнительного текста вне JSON.
-
-    {{
-        "summary": "краткое содержание текста (2-4 предложения)",
-        "keywords": ["ключевое_слово1", "ключевое_слово2", "ключевое_слово3"]
-    }}
-
-    # ВАЖНО
-    - Ответь только JSON
-    - Не добавляй пояснений
-    - Сохрани смысл исходного текста
-    - Ключевые слова должны быть на том же языке, что и текст
-    """
+# ПРИМЕР ФОРМАТА
+{{
+    "reasoning": "Основная мысль текста — определение ИИ и его применение. Ключевые слова: искусственный интеллект (главный термин), машинное обучение (ключевая технология), нейросети (пример применения).",
+    "summary": "Искусственный интеллект — область компьютерных наук, создающая системы для задач, требующих человеческого интеллекта.",
+    "keywords": ["искусственный интеллект", "машинное обучение", "нейросети"]
+}}
+"""
 
         try:
             result = await self._make_request(prompt, temperature=0.3)
 
             processing_time_ms = int((time.time() - start_time) * 1000)
 
+            reasoning = result.get("reasoning", "Рассуждения не предоставлены")
+
             return SummaryResponse(
                 summary=result.get("summary", result.get("text", "")),
                 keywords=result.get("keywords", []),
                 original_length=len(text),
                 summary_length=len(result.get("summary", result.get("text", ""))),
+                reasoning=reasoning,
                 model_name=self.model,
                 temperature=0.3,
                 processing_time_ms=processing_time_ms,
@@ -372,6 +384,7 @@ class LLMService:
                 keywords=[],
                 original_length=len(text),
                 summary_length=0,
+                reasoning=f"Произошла ошибка при суммаризации: {str(e)}",
                 model_name=self.model,
                 temperature=0.3,
                 processing_time_ms=processing_time_ms,
