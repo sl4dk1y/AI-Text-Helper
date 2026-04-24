@@ -29,7 +29,7 @@ class LLMService:
             logger.error("API ключ OpenRouter не найден! Проверьте .env файл")
             raise ValueError("API ключ OpenRouter не найден")
 
-        logger.info(f"Инициализация LLMService с моделью: {self.model}")
+        logger.info(f"Инициализация LLMService с модельой: {self.model}")
 
     async def _make_request(self, prompt: str, temperature: float = None):
         """Отправка запроса к OpenRouter"""
@@ -116,16 +116,11 @@ class LLMService:
         if text == "string" or text == "":
             logger.info("Получены тестовые данные, возвращаю как есть")
             return ImprovedTextResponse(
+                reasoning="Тестовый запрос, обработка не требуется.",
                 original_text=text,
                 improved_text=text,
                 applied_instruction=instruction,
-                changes_made="Тестовый запрос",
-                reasoning="Тестовый запрос, обработка не требуется.",
-                model_name=self.model,
-                temperature=self.temperature,
-                processing_time_ms=0,
-                timestamp=datetime.now(),
-                tokens_used=None
+                changes_made="Тестовый запрос"
             )
 
         # 1. Поиск через ретривер
@@ -142,27 +137,11 @@ class LLMService:
                 retrieved_context = f"Известные исправления: {', '.join(corrections)}"
                 logger.info(f"Ретривер нашёл: {retrieved_context}")
 
-        # 2. Формирование промпта с учётом контекста ретривера и требованием reasoning
-        base_prompt = """
-# ЗАДАЧА
-Ты — профессиональный редактор русского языка. Исправь ошибки в тексте.
-
-# ПРАВИЛА
-1. Проанализируй текст и найди орфографические и грамматические ошибки
-2. Запиши свои рассуждения в поле reasoning (что ты нашёл, почему решил исправить именно так)
-3. Исправь найденные ошибки
-4. Составь список исправлений
-
-# ФОРМАТ ОТВЕТА
-Верни JSON с четырьмя полями:
-- reasoning: твои рассуждения о том, какие ошибки ты нашёл и почему их исправил именно так
-- improved_text: исправленный текст целиком
-- changes_made: список исправлений через запятую
-"""
-
+        # 2. Формирование промпта с учётом контекста ретривера
         if retrieved_context:
             prompt = f"""
-{base_prompt}
+# ЗАДАЧА
+Ты — профессиональный редактор русского языка. Исправь ошибки в тексте.
 
 # БАЗА ЗНАНИЙ (найденные соответствия)
 {retrieved_context}
@@ -175,7 +154,13 @@ class LLMService:
 # ИНСТРУКЦИЯ
 {instruction}
 
-# ПРИМЕР ФОРМАТА
+# ФОРМАТ ОТВЕТА
+Верни JSON с полями в следующем порядке:
+1. reasoning - твои рассуждения о том, какие ошибки ты нашёл и почему их исправил именно так
+2. improved_text - исправленный текст целиком
+3. changes_made - список исправлений через запятую
+
+Пример:
 {{
     "reasoning": "Я проанализировал текст. Слово 'нагода' не существует в русском языке. Ближайшее по смыслу и звучанию — 'погода'. Остальные слова написаны правильно.",
     "improved_text": "погода сегодня хорошая",
@@ -184,7 +169,8 @@ class LLMService:
 """
         else:
             prompt = f"""
-{base_prompt}
+# ЗАДАЧА
+Ты — профессиональный редактор русского языка. Исправь ошибки в тексте.
 
 # ИСХОДНЫЕ ДАННЫЕ
 --- НАЧАЛО ТЕКСТА ---
@@ -194,7 +180,13 @@ class LLMService:
 # ИНСТРУКЦИЯ
 {instruction}
 
-# ПРИМЕР ФОРМАТА
+# ФОРМАТ ОТВЕТА
+Верни JSON с полями в следующем порядке:
+1. reasoning - твои рассуждения о том, какие ошибки ты нашёл и почему их исправил именно так
+2. improved_text - исправленный текст целиком
+3. changes_made - список исправлений через запятую
+
+Пример:
 {{
     "reasoning": "Я проанализировал текст. Слово 'нагода' не существует в русском языке. Ближайшее по смыслу и звучанию — 'погода'. Остальные слова написаны правильно.",
     "improved_text": "погода сегодня хорошая",
@@ -205,8 +197,6 @@ class LLMService:
         try:
             logger.info(f"Отправка запроса на исправление текста: {text[:50]}...")
             result = await self._make_request(prompt, temperature=0.3)
-
-            processing_time_ms = int((time.time() - start_time) * 1000)
 
             # Извлекаем данные из ответа
             reasoning = result.get("reasoning", "Рассуждения не предоставлены")
@@ -219,26 +209,18 @@ class LLMService:
                 changes = str(changes_raw)
 
             return ImprovedTextResponse(
+                reasoning=reasoning,
                 original_text=text,
                 improved_text=improved,
                 applied_instruction=instruction,
-                changes_made=changes,
-                reasoning=reasoning,
-                model_name=self.model,
-                temperature=self.temperature,
-                processing_time_ms=processing_time_ms,
-                timestamp=datetime.now(),
-                tokens_used=None
+                changes_made=changes
             )
         except Exception as e:
             logger.error(f"Ошибка improve_text: {e}")
-            return await self.improve_text_fallback(text, instruction, start_time)
+            return await self.improve_text_fallback(text, instruction)
 
-    async def improve_text_fallback(self, text: str, instruction: str, start_time: float = None) -> ImprovedTextResponse:
+    async def improve_text_fallback(self, text: str, instruction: str) -> ImprovedTextResponse:
         """Запасной метод для улучшения текста с reasoning"""
-
-        if start_time is None:
-            start_time = time.time()
 
         # Проверка через ретривер в fallback
         retrieved_context = None
@@ -253,20 +235,10 @@ class LLMService:
             if corrections:
                 retrieved_context = f"Известные исправления: {', '.join(corrections)}"
 
-        base_prompt = """
-# ЗАДАЧА
-Ты — редактор русского языка. Исправь ошибки в тексте.
-
-# ФОРМАТ ОТВЕТА
-Верни JSON с четырьмя полями:
-- reasoning: твои рассуждения
-- improved_text: исправленный текст
-- changes_made: что исправлено
-"""
-
         if retrieved_context:
             prompt = f"""
-{base_prompt}
+# ЗАДАЧА
+Ты — редактор русского языка. Исправь ошибки в тексте.
 
 # БАЗА ЗНАНИЙ (найденные соответствия)
 {retrieved_context}
@@ -276,58 +248,58 @@ class LLMService:
 
 # ИНСТРУКЦИЯ
 {instruction}
+
+# ФОРМАТ ОТВЕТА
+{{
+    "reasoning": "твои рассуждения",
+    "improved_text": "исправленный текст",
+    "changes_made": "что исправлено"
+}}
 """
         else:
             prompt = f"""
-{base_prompt}
+# ЗАДАЧА
+Ты — редактор русского языка. Исправь ошибки в тексте.
 
 # ТЕКСТ
 {text}
 
 # ИНСТРУКЦИЯ
 {instruction}
+
+# ФОРМАТ ОТВЕТА
+{{
+    "reasoning": "твои рассуждения",
+    "improved_text": "исправленный текст",
+    "changes_made": "что исправлено"
+}}
 """
 
         try:
             result = await self._make_request(prompt, temperature=0.5)
 
-            processing_time_ms = int((time.time() - start_time) * 1000)
-
             reasoning = result.get("reasoning", "Рассуждения не предоставлены")
 
             return ImprovedTextResponse(
+                reasoning=reasoning,
                 original_text=text,
                 improved_text=result.get("improved_text", result.get("text", text)),
                 applied_instruction=instruction,
-                changes_made=result.get("changes_made", "Исправления выполнены"),
-                reasoning=reasoning,
-                model_name=self.model,
-                temperature=0.5,
-                processing_time_ms=processing_time_ms,
-                timestamp=datetime.now(),
-                tokens_used=None
+                changes_made=result.get("changes_made", "Исправления выполнены")
             )
         except Exception as e:
             logger.error(f"Ошибка в fallback методе: {e}")
-            processing_time_ms = int((time.time() - start_time) * 1000)
 
             return ImprovedTextResponse(
+                reasoning=f"Произошла ошибка при обработке: {str(e)}",
                 original_text=text,
                 improved_text=text,
                 applied_instruction=instruction,
-                changes_made="Не удалось обработать текст",
-                reasoning=f"Произошла ошибка при обработке: {str(e)}",
-                model_name=self.model,
-                temperature=self.temperature,
-                processing_time_ms=processing_time_ms,
-                timestamp=datetime.now(),
-                tokens_used=None
+                changes_made="Не удалось обработать текст"
             )
 
     async def summarize(self, text: str) -> SummaryResponse:
         """Суммаризация текста с Schema-Guided Reasoning"""
-
-        start_time = time.time()
 
         prompt = f"""
 # ЗАДАЧА
@@ -340,10 +312,10 @@ class LLMService:
 4. Выдели 3-5 ключевых слов
 
 # ФОРМАТ ОТВЕТА
-Верни JSON с тремя полями:
-- reasoning: твои рассуждения о том, что является главной мыслью текста
-- summary: краткое содержание (2-4 предложения)
-- keywords: список ключевых слов
+Верни JSON с полями в следующем порядке:
+1. reasoning - твои рассуждения о том, что является главной мыслью текста
+2. summary - краткое содержание (2-4 предложения)
+3. keywords - список ключевых слов
 
 # ТЕКСТ
 {text}
@@ -359,35 +331,22 @@ class LLMService:
         try:
             result = await self._make_request(prompt, temperature=0.3)
 
-            processing_time_ms = int((time.time() - start_time) * 1000)
-
             reasoning = result.get("reasoning", "Рассуждения не предоставлены")
 
             return SummaryResponse(
+                reasoning=reasoning,
                 summary=result.get("summary", result.get("text", "")),
                 keywords=result.get("keywords", []),
                 original_length=len(text),
-                summary_length=len(result.get("summary", result.get("text", ""))),
-                reasoning=reasoning,
-                model_name=self.model,
-                temperature=0.3,
-                processing_time_ms=processing_time_ms,
-                timestamp=datetime.now(),
-                tokens_used=None
+                summary_length=len(result.get("summary", result.get("text", "")))
             )
         except Exception as e:
             logger.error(f"Ошибка summarize: {e}")
-            processing_time_ms = int((time.time() - start_time) * 1000)
 
             return SummaryResponse(
+                reasoning=f"Произошла ошибка при суммаризации: {str(e)}",
                 summary="",
                 keywords=[],
                 original_length=len(text),
-                summary_length=0,
-                reasoning=f"Произошла ошибка при суммаризации: {str(e)}",
-                model_name=self.model,
-                temperature=0.3,
-                processing_time_ms=processing_time_ms,
-                timestamp=datetime.now(),
-                tokens_used=None
+                summary_length=0
             )
