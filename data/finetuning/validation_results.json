@@ -1,7 +1,7 @@
 {
   "TinyLlama": {
-    "accuracy": 0.0,
-    "correct": 0,
+    "accuracy": 0.1,
+    "correct": 1,
     "total": 10
   },
   "OPT-350m": {
@@ -10,8 +10,8 @@
     "total": 10
   },
   "GPT-2": {
-    "accuracy": 0.0,
-    "correct": 0,
+    "accuracy": 0.1,
+    "correct": 1,
     "total": 10
   }
 }
