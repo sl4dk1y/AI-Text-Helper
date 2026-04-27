@@ -27,9 +27,9 @@ val_df = val_df.rename(columns={input_col: 'input', output_col: 'output'})
 test_df = test_df.rename(columns={input_col: 'input', output_col: 'output'})
 
 # Сохраняем в удобном формате
-train_df.to_csv("data/train.csv", index=False)
-val_df.to_csv("data/val.csv", index=False)
-test_df.to_csv("data/test.csv", index=False)
+train_df.to_csv("data/finetuning/train.csv", index=False)
+val_df.to_csv("data/finetuning/val.csv", index=False)
+test_df.to_csv("data/finetuning/test.csv", index=False)
 
 print("\nГотово! Файлы сохранены:")
 print("- data/finetuning/train.csv")
