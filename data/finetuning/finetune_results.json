@@ -1,0 +1,14 @@
+{
+  "TinyLlama/TinyLlama-1.1B-Chat-v1.0": {
+    "time_min": 12.29681886434555,
+    "output_dir": "data/finetuning/lora_tinyllama"
+  },
+  "facebook/opt-350m": {
+    "time_min": 4.776648497581482,
+    "output_dir": "data/finetuning/lora_opt_350m"
+  },
+  "gpt2": {
+    "time_min": 2.7493197679519654,
+    "output_dir": "data/finetuning/lora_gpt2"
+  }
+}

@@ -37,6 +37,14 @@ data/finetuning/*.csv
 **/events.out.tfevents.*
 **/wandb/
 
+data/finetuning/lora_*/README.md
+data/finetuning/lora_*/merges.txt
+data/finetuning/lora_*/vocab.json
+data/finetuning/lora_*/tokenizer.json
+data/finetuning/lora_*/tokenizer_config.json
+data/finetuning/lora_*/special_tokens_map.json
+data/finetuning/lora_*/chat_template.jinja
+
 # Большие CSV файлы 
 data/RuWikiLarge_*.csv
 data/finetuning/*.csv
@@ -44,3 +52,5 @@ data/finetuning/*.csv
 # Служебные файлы
 **/__pycache__/
 **/*.pyc
+
+
