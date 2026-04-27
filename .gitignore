@@ -24,3 +24,5 @@ env/
 .DS_Store
 **/.DS_Store
 ._*
+data/RuWikiLarge_*.csv
+data/finetuning/*.csv
