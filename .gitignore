@@ -26,3 +26,21 @@ env/
 ._*
 data/RuWikiLarge_*.csv
 data/finetuning/*.csv
+
+# Fine-tuning temporary files 
+**/checkpoint-*/
+**/optimizer.pt
+**/scheduler.pt
+**/trainer_state.json
+**/training_args.bin
+**/rng_state.pth
+**/events.out.tfevents.*
+**/wandb/
+
+# Большие CSV файлы 
+data/RuWikiLarge_*.csv
+data/finetuning/*.csv
+
+# Служебные файлы
+**/__pycache__/
+**/*.pyc
