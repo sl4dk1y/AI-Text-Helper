@@ -53,4 +53,4 @@ data/finetuning/*.csv
 **/__pycache__/
 **/*.pyc
 
-
+scripts/analyze_multisim.py
