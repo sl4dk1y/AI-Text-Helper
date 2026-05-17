@@ -54,3 +54,16 @@ data/finetuning/*.csv
 **/*.pyc
 
 scripts/analyze_multisim.py
+
+# Базы данных
+*.db
+*.sqlite3
+
+# Ollama модели (если не хотите коммитить)
+.ollama/
+
+# LiteLLM логи
+litellm_logs/
+
+# Langfuse кеш
+.langfuse_cache/

@@ -1,0 +1,44 @@
+services:
+  langfuse:
+    image: langfuse/langfuse:2.45.0
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/postgres
+      - NEXTAUTH_SECRET=langfuse-secret-key-change-me
+      - SALT=langfuse-salt-change-me
+      - NEXTAUTH_URL=http://localhost:3000
+      - TELEMETRY_ENABLED=false
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=langfuse
+    volumes:
+      - langfuse_postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  litellm:
+    image: ghcr.io/berriai/litellm:main-stable
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./litellm_config.yaml:/app/config.yaml
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # Доступ к хосту с Mac/Linux
+    environment:
+      - LANGFUSE_PUBLIC_KEY=pk-lf-...
+      - LANGFUSE_SECRET_KEY=sk-lf-...
+      - LANGFUSE_HOST=http://langfuse:3000
+    depends_on:
+      - langfuse
+    restart: unless-stopped
+
+volumes:
+  langfuse_postgres_data:

@@ -1,0 +1,20 @@
+model_list:
+  - model_name: "qwen-local"
+    litellm_params:
+      model: "ollama_chat/qwen3.5:9b"
+      #api_key: "sk-or-v1-..." 
+      api_base: "http://host.docker.internal:11434"
+      max_tokens: 500
+      temperature: 0.7
+      input_cost_per_token: 0.0001
+      output_cost_per_token: 0.0002
+
+general_settings:
+  master_key: "sk-litellm-master-key-12345"
+  store_model_in_db: true
+  database_url: "postgresql://postgres:postgres@postgres:5432/langfuse"
+  allow_client_side_credentials: true
+
+
+litellm_settings:
+  callbacks: ["langfuse"]

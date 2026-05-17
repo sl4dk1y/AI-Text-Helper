@@ -5,9 +5,9 @@ from datetime import datetime
 from ..core.config import settings
 from ..models.schemas import ImprovedTextResponse, SummaryResponse
 import logging
+from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
-
 
 class LLMService:
     def __init__(self):
@@ -26,13 +26,13 @@ class LLMService:
             logger.warning(f"Не удалось инициализировать ретривер: {e}")
 
         if not self.api_key:
-            logger.error("API ключ OpenRouter не найден! Проверьте .env файл")
-            raise ValueError("API ключ OpenRouter не найден")
+            logger.error("API ключ не найден! Проверьте .env файл")
+            raise ValueError("API ключ не найден")
 
-        logger.info(f"Инициализация LLMService с модельой: {self.model}")
+        logger.info(f"Инициализация LLMService с моделью: {self.model}")
 
     async def _make_request(self, prompt: str, temperature: float = None):
-        """Отправка запроса к OpenRouter"""
+        """Отправка запроса к LLM через LiteLLM"""
         url = f"{self.base_url}/chat/completions"
 
         headers = {
@@ -60,14 +60,14 @@ class LLMService:
         }
 
         try:
-            logger.info(f"Отправка запроса к OpenRouter. Модель: {self.model}")
+            logger.info(f"Отправка запроса к LLM. Модель: {self.model}")
 
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     url,
                     json=payload,
                     headers=headers,
-                    timeout=30.0
+                    timeout=180.0
                 )
 
                 response.raise_for_status()
@@ -75,32 +75,37 @@ class LLMService:
 
                 if "error" in data:
                     error_msg = data["error"].get("message", "Неизвестная ошибка")
-                    logger.error(f"Ошибка OpenRouter: {error_msg}")
-                    raise Exception(f"OpenRouter error: {error_msg}")
+                    logger.error(f"Ошибка LLM: {error_msg}")
+                    raise Exception(f"LLM error: {error_msg}")
 
                 if not data.get("choices") or len(data["choices"]) == 0:
-                    raise Exception("Пустой ответ от OpenRouter")
+                    raise Exception("Пустой ответ от LLM")
 
-                content = data["choices"][0]["message"]["content"]
+                # Читаем из reasoning_content, если content пустой (для Ollama)
+                message = data["choices"][0]["message"]
+                content = message.get("content") or message.get("reasoning_content") or ""
 
+                # Безопасный парсинг JSON с фоллбэком
                 try:
                     return json.loads(content)
-                except json.JSONDecodeError:
-                    logger.error(f"Не удалось распарсить JSON ответ: {content}")
-                    return {"text": content}
+                except (json.JSONDecodeError, TypeError):
+                    # Если модель вернула не-JSON — возвращаем как текст
+                    logger.warning(f"Ответ не в формате JSON, используем как текст: {content[:100]}...")
+                    return {"improved_text": content, "reasoning": "Текстовый ответ (не JSON)"}
 
         except httpx.TimeoutException:
-            logger.error("Таймаут при запросе к OpenRouter")
-            raise Exception("Превышено время ожидания ответа от OpenRouter")
+            logger.error("Таймаут при запросе к LLM")
+            raise Exception("Превышено время ожидания ответа от LLM")
 
         except httpx.HTTPStatusError as e:
             logger.error(f"HTTP ошибка: {e.response.status_code}")
             if e.response.status_code == 401:
-                raise Exception("Неверный API ключ OpenRouter. Проверьте .env файл")
+                raise Exception("Неверный API ключ. Проверьте .env файл")
             elif e.response.status_code == 402:
-                raise Exception("Недостаточно средств на счете OpenRouter. Используйте бесплатную модель")
+                # Пробрасываем ошибку бюджета, чтобы не вызывать fallback
+                raise Exception("BUDGET_EXCEEDED:402")
             elif e.response.status_code == 429:
-                raise Exception("Слишком много запросов. Лимит OpenRouter")
+                raise Exception("Слишком много запросов. Превышен лимит")
             else:
                 raise Exception(f"HTTP ошибка {e.response.status_code}: {e.response.text}")
 
@@ -211,12 +216,15 @@ class LLMService:
             return ImprovedTextResponse(
                 reasoning=reasoning,
                 original_text=text,
-                improved_text=improved,
+                improved_text=improved if improved else text,  # Фоллбэк на исходный текст
                 applied_instruction=instruction,
                 changes_made=changes
             )
         except Exception as e:
             logger.error(f"Ошибка improve_text: {e}")
+            # Обработка превышения бюджета
+            if "BUDGET_EXCEEDED:402" in str(e):
+                raise HTTPException(status_code=402, detail="Превышен дневной бюджет на API")
             return await self.improve_text_fallback(text, instruction)
 
     async def improve_text_fallback(self, text: str, instruction: str) -> ImprovedTextResponse:
@@ -279,17 +287,25 @@ class LLMService:
             result = await self._make_request(prompt, temperature=0.5)
 
             reasoning = result.get("reasoning", "Рассуждения не предоставлены")
+            improved = result.get("improved_text", result.get("text", text))
+            
+            # Фоллбэк: если нет improved_text, берём reasoning_content или сырой текст
+            if not improved and result.get("reasoning_content"):
+                improved = result["reasoning_content"]
 
             return ImprovedTextResponse(
                 reasoning=reasoning,
                 original_text=text,
-                improved_text=result.get("improved_text", result.get("text", text)),
+                improved_text=improved if improved else text,
                 applied_instruction=instruction,
                 changes_made=result.get("changes_made", "Исправления выполнены")
             )
         except Exception as e:
             logger.error(f"Ошибка в fallback методе: {e}")
-
+            # Обработка превышения бюджета и в fallback
+            if "BUDGET_EXCEEDED:402" in str(e):
+                raise HTTPException(status_code=402, detail="Превышен дневной бюджет на API")
+            
             return ImprovedTextResponse(
                 reasoning=f"Произошла ошибка при обработке: {str(e)}",
                 original_text=text,
@@ -332,17 +348,25 @@ class LLMService:
             result = await self._make_request(prompt, temperature=0.3)
 
             reasoning = result.get("reasoning", "Рассуждения не предоставлены")
+            summary = result.get("summary", result.get("text", ""))
+            
+            # Фоллбэк для summary
+            if not summary and result.get("reasoning_content"):
+                summary = result["reasoning_content"]
 
             return SummaryResponse(
                 reasoning=reasoning,
-                summary=result.get("summary", result.get("text", "")),
+                summary=summary if summary else "",
                 keywords=result.get("keywords", []),
                 original_length=len(text),
-                summary_length=len(result.get("summary", result.get("text", "")))
+                summary_length=len(summary)
             )
         except Exception as e:
             logger.error(f"Ошибка summarize: {e}")
-
+            # Обработка превышения бюджета и здесь
+            if "BUDGET_EXCEEDED:402" in str(e):
+                raise HTTPException(status_code=402, detail="Превышен дневной бюджет на API")
+            
             return SummaryResponse(
                 reasoning=f"Произошла ошибка при суммаризации: {str(e)}",
                 summary="",
