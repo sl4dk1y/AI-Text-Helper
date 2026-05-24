@@ -87,6 +87,24 @@ async def summarize_text(summarize_req: SummarizeRequest, request: Request):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ошибка: {str(e)}")
 
+@router.get("/info")
+async def get_info():
+    return {
+        "input_type": "text",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "instruction": {"type": "string", "description": "Инструкция"}
+            }
+        },
+        "output_schema": {
+            "type": "object",
+            "properties": {
+                "improved_text": {"type": "string"},
+                "reasoning": {"type": "string"}
+            }
+        }
+    }
 
 @router.get("/health")
 async def health_check(request: Request):

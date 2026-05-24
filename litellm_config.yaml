@@ -10,11 +10,14 @@ model_list:
       output_cost_per_token: 0.0002
 
 general_settings:
-  master_key: "sk-litellm-master-key-12345"
-  store_model_in_db: true
+  master_key: "sk-b8vsAbM4VpBVu56q6BKOgQ"
+  store_model_in_db: false
   database_url: "postgresql://postgres:postgres@postgres:5432/langfuse"
   allow_client_side_credentials: true
 
 
 litellm_settings:
   callbacks: ["langfuse"]
+  langfuse_host: "http://langfuse:3000"
+  langfuse_public_key: "pk-litellm-master-key-12345"
+  langfuse_secret_key: "sk-litellm-master-key-12345"

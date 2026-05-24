@@ -4,7 +4,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/postgres
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/langfuse
       - NEXTAUTH_SECRET=langfuse-secret-key-change-me
       - SALT=langfuse-salt-change-me
       - NEXTAUTH_URL=http://localhost:3000
@@ -33,12 +33,51 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"  # Доступ к хосту с Mac/Linux
     environment:
-      - LANGFUSE_PUBLIC_KEY=pk-lf-...
-      - LANGFUSE_SECRET_KEY=sk-lf-...
+      - LANGFUSE_PUBLIC_KEY=${ENV_VAR}
+      - LANGFUSE_SECRET_KEY=${ENV_VAR}
       - LANGFUSE_HOST=http://langfuse:3000
     depends_on:
       - langfuse
     restart: unless-stopped
+
+  fastapi:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aitexthelper-fastapi
+    ports:
+      - "8000:8000"
+    env_file: .env          
+    environment:
+      - LLM_BASE_URL=${LLM_BASE_URL}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_MODEL=${LLM_MODEL}
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
+      - LANGFUSE_HOST=${LANGFUSE_HOST}
+      - TEMPERATURE=${TEMPERATURE}
+      - MAX_TOKENS=${MAX_TOKENS}
+    depends_on:
+      - litellm
+    networks:
+      - aitexthelper_network
+    restart: unless-stopped
+
+  locust:
+    image: locustio/locust:latest
+    container_name: aitexthelper-locust
+    ports:
+      - "8089:8089"
+    volumes:
+      - ./locust:/mnt/locust
+    command: -f /mnt/locust/locustfile.py --host http://host.docker.internal:8000
+    profiles:
+      - test
+    restart: unless-stopped
+
+networks:
+  aitexthelper_network:
+    driver: bridge  
 
 volumes:
   langfuse_postgres_data:
