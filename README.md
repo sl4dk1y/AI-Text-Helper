@@ -31,9 +31,12 @@
 
 ### Предварительные требования
 
-- ✅ [Docker](https://docs.docker.com/get-docker/) и [Docker Compose](https://docs.docker.com/compose/install/)
-- ✅ [Ollama](https://ollama.ai) с моделью `qwen3.5:9b`
-- ✅ Минимум 8 ГБ ОЗУ (рекомендуется 16 ГБ для локальной модели)
+<<<<<<< HEAD
+=======
+- [Docker](https://docs.docker.com/get-docker/) и [Docker Compose](https://docs.docker.com/compose/install/)
+- [Ollama](https://ollama.ai) с моделью `qwen3.5:9b`
+- Минимум 8 ГБ ОЗУ (рекомендуется 16 ГБ для локальной модели)
+>>>>>>> fccfda2 (Обновленная документация)
 
 ### Шаг 1: Клонирование и настройка
 
@@ -121,7 +124,10 @@ curl http://localhost:8000/health
 # {"status":"ok"}
 ```
 ## 🧪 Примеры использования
-###✏️ Исправление ошибок
+<<<<<<< HEAD
+=======
+### ✏️ Исправление ошибок
+>>>>>>> fccfda2 (Обновленная документация)
 
 ```bash
 # Простая орфография
@@ -153,7 +159,10 @@ curl -X POST http://localhost:8000/run \
 
 ```
 
-🔍 Edge cases
+<<<<<<< HEAD
+=======
+## 🔍 Edge cases
+>>>>>>> fccfda2 (Обновленная документация)
 ```bash
 # Текст без ошибок
 curl -X POST http://localhost:8000/run \
@@ -189,7 +198,10 @@ docker-compose logs -f ollama
 docker-compose logs -f
 ```
 
-##📈 Метрики в Langfuse
+<<<<<<< HEAD
+=======
+## 📈 Метрики в Langfuse
+>>>>>>> fccfda2 (Обновленная документация)
 - Откройте http://localhost:3000
 - Войдите (по умолчанию без пароля для dev-режима)
 - Перейдите в Traces для просмотра:
@@ -200,7 +212,10 @@ docker-compose logs -f
 
 
 ## 🧪 Нагрузочное тестирование (Locust)
-###Запуск тестов
+<<<<<<< HEAD
+=======
+### Запуск тестов
+>>>>>>> fccfda2 (Обновленная документация)
 ```bash
 # Запустить контейнер Locust
 docker-compose --profile test up -d locust
@@ -226,8 +241,11 @@ locust -f locust/locustfile.py \
 ```
 
 
-##🔧 Устранение неполадок
-###❌ Ошибка: "Connection refused" к Ollama
+<<<<<<< HEAD
+=======
+## 🔧 Устранение неполадок
+### ❌ Ошибка: "Connection refused" к Ollama
+>>>>>>> fccfda2 (Обновленная документация)
 ```bash
 # Проверить, запущена ли модель
 ollama list
@@ -240,21 +258,30 @@ docker-compose exec fastapi curl http://host.docker.internal:11434/api/tags
 
 ```
 
-###❌ Ошибка: "JSON не найден" в ответе
+<<<<<<< HEAD
+=======
+### ❌ Ошибка: "JSON не найден" в ответе
+>>>>>>> fccfda2 (Обновленная документация)
 Причина: Модель обрезала ответ из-за max_tokens.
 Решение:
 - Увеличить max_tokens в litellm_config.yaml до 2000
 - Пересобрать: docker-compose build --no-cache fastapi litellm
 - Перезапустить: docker-compose up -d
 
-###❌ Ошибка: Таймаут запроса
+<<<<<<< HEAD
+=======
+### ❌ Ошибка: Таймаут запроса
+>>>>>>> fccfda2 (Обновленная документация)
 Причина: Локальная модель работает медленно.
 Решение:
 - Увеличить timeout в llm_service.py (по умолчанию 300 сек)
 - Использовать более мощное железо или GPU
 - Уменьшить max_tokens для ускорения
 
-###❌ Ошибка: "API ключ не найден"
+<<<<<<< HEAD
+=======
+### ❌ Ошибка: "API ключ не найден"
+>>>>>>> fccfda2 (Обновленная документация)
 ```bash
 # Проверить .env файл
 cat .env | grep LLM_API_KEY
@@ -263,7 +290,10 @@ cat .env | grep LLM_API_KEY
 docker-compose restart fastapi
 
 ```
-##Оптимизация
+<<<<<<< HEAD
+=======
+## Оптимизация
+>>>>>>> fccfda2 (Обновленная документация)
 ```bash
 Для ускорения ответов (ценой качества):
 max_tokens: 1000      # Меньше токенов = быстрее
