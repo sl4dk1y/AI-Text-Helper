@@ -30,9 +30,6 @@
 ## 🚀 Быстрый старт
 
 ### Предварительные требования
-
-<<<<<<< HEAD
-=======
 - [Docker](https://docs.docker.com/get-docker/) и [Docker Compose](https://docs.docker.com/compose/install/)
 - [Ollama](https://ollama.ai) с моделью `qwen3.5:9b`
 - Минимум 8 ГБ ОЗУ (рекомендуется 16 ГБ для локальной модели)
@@ -124,8 +121,6 @@ curl http://localhost:8000/health
 # {"status":"ok"}
 ```
 ## 🧪 Примеры использования
-<<<<<<< HEAD
-=======
 ### ✏️ Исправление ошибок
 >>>>>>> fccfda2 (Обновленная документация)
 
@@ -159,8 +154,6 @@ curl -X POST http://localhost:8000/run \
 
 ```
 
-<<<<<<< HEAD
-=======
 ## 🔍 Edge cases
 >>>>>>> fccfda2 (Обновленная документация)
 ```bash
@@ -198,8 +191,6 @@ docker-compose logs -f ollama
 docker-compose logs -f
 ```
 
-<<<<<<< HEAD
-=======
 ## 📈 Метрики в Langfuse
 >>>>>>> fccfda2 (Обновленная документация)
 - Откройте http://localhost:3000
@@ -212,8 +203,6 @@ docker-compose logs -f
 
 
 ## 🧪 Нагрузочное тестирование (Locust)
-<<<<<<< HEAD
-=======
 ### Запуск тестов
 >>>>>>> fccfda2 (Обновленная документация)
 ```bash
@@ -240,9 +229,6 @@ locust -f locust/locustfile.py \
 
 ```
 
-
-<<<<<<< HEAD
-=======
 ## 🔧 Устранение неполадок
 ### ❌ Ошибка: "Connection refused" к Ollama
 >>>>>>> fccfda2 (Обновленная документация)
@@ -258,8 +244,6 @@ docker-compose exec fastapi curl http://host.docker.internal:11434/api/tags
 
 ```
 
-<<<<<<< HEAD
-=======
 ### ❌ Ошибка: "JSON не найден" в ответе
 >>>>>>> fccfda2 (Обновленная документация)
 Причина: Модель обрезала ответ из-за max_tokens.
@@ -268,8 +252,6 @@ docker-compose exec fastapi curl http://host.docker.internal:11434/api/tags
 - Пересобрать: docker-compose build --no-cache fastapi litellm
 - Перезапустить: docker-compose up -d
 
-<<<<<<< HEAD
-=======
 ### ❌ Ошибка: Таймаут запроса
 >>>>>>> fccfda2 (Обновленная документация)
 Причина: Локальная модель работает медленно.
@@ -278,8 +260,6 @@ docker-compose exec fastapi curl http://host.docker.internal:11434/api/tags
 - Использовать более мощное железо или GPU
 - Уменьшить max_tokens для ускорения
 
-<<<<<<< HEAD
-=======
 ### ❌ Ошибка: "API ключ не найден"
 >>>>>>> fccfda2 (Обновленная документация)
 ```bash
@@ -290,8 +270,6 @@ cat .env | grep LLM_API_KEY
 docker-compose restart fastapi
 
 ```
-<<<<<<< HEAD
-=======
 ## Оптимизация
 >>>>>>> fccfda2 (Обновленная документация)
 ```bash
