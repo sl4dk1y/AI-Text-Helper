@@ -4,7 +4,7 @@ model_list:
       model: "ollama_chat/qwen3.5:9b"
       #api_key: "sk-or-v1-..." 
       api_base: "http://host.docker.internal:11434"
-      max_tokens: 500
+      max_tokens: 1500
       temperature: 0.7
       input_cost_per_token: 0.0001
       output_cost_per_token: 0.0002
@@ -19,5 +19,7 @@ general_settings:
 litellm_settings:
   callbacks: ["langfuse"]
   langfuse_host: "http://langfuse:3000"
-  langfuse_public_key: "pk-litellm-master-key-12345"
-  langfuse_secret_key: "sk-litellm-master-key-12345"
+  langfuse_public_key: "pk-lf-..."
+  langfuse_secret_key: "sk-lf-..."
+
+  

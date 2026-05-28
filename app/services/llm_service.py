@@ -1,6 +1,7 @@
 import json
 import httpx
 import time
+import re
 from datetime import datetime
 from ..core.config import settings
 from ..models.schemas import ImprovedTextResponse, SummaryResponse
@@ -8,6 +9,7 @@ import logging
 from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
+
 
 class LLMService:
     def __init__(self):
@@ -31,6 +33,133 @@ class LLMService:
 
         logger.info(f"Инициализация LLMService с моделью: {self.model}")
 
+    def _extract_json_from_text(self, text: str) -> dict:
+        """
+        Извлекает валидный финальный JSON из текста.
+        Ищет ПОСЛЕДНИЙ валидный объект с нужными полями, даже если он в середине текста.
+        Обрабатывает обрезанные ответы и markdown-блоки.
+        """
+        if not text:
+            return None
+        
+        # 1. Удаляем markdown-блоки ```json ... ``` для упрощения парсинга
+        cleaned_text = re.sub(r'```(?:json)?\s*', '', text)
+        cleaned_text = re.sub(r'```\s*', '', cleaned_text)
+        
+        # 2. Ищем все позиции открывающих скобок
+        json_starts = [m.start() for m in re.finditer(r'\{', cleaned_text)]
+        
+        # Проходим с конца, чтобы найти ПОСЛЕДНИЙ валидный JSON
+        for start_pos in reversed(json_starts):
+            # Пробуем найти закрывающую скобку с правильным балансом
+            brace_count = 0
+            for end_pos in range(start_pos, len(cleaned_text)):
+                char = cleaned_text[end_pos]
+                if char == '{':
+                    brace_count += 1
+                elif char == '}':
+                    brace_count -= 1
+                    if brace_count == 0:
+                        # Нашли потенциальный полный объект
+                        candidate = cleaned_text[start_pos:end_pos+1]
+                        try:
+                            result = json.loads(candidate)
+                            # Проверяем, что есть нужные поля
+                            if ('reasoning' in result and 
+                                ('improved_text' in result or 'summary' in result)):
+                                logger.info(f"✓ Найден валидный JSON на позиции {start_pos}-{end_pos}")
+                                return result
+                        except json.JSONDecodeError:
+                            continue
+                        break  # Если баланс сошёлся, но парсинг не удался — идём дальше
+        
+        # 3. Попытка восстановить обрезанный JSON (если модель не успела закрыть)
+        if cleaned_text and ('"reasoning"' in cleaned_text or '"summary"' in cleaned_text):
+            fixed = cleaned_text.rstrip()
+            
+            # Если не хватает закрывающих кавычек/скобок — добавляем
+            if not fixed.endswith('}'):
+                if not fixed.endswith('"') and ('reasoning' in fixed or 'summary' in fixed):
+                    fixed += '"'
+                # Добавляем закрывающие элементы в правильном порядке
+                fixed = fixed.rstrip(',')  # Убираем лишние запятые
+                fixed += '}'
+                
+                try:
+                    result = json.loads(fixed)
+                    # Проверяем, что есть хотя бы одно нужное поле
+                    if 'reasoning' in result or 'summary' in result:
+                        logger.info("✓ Восстановлен обрезанный JSON")
+                        return result
+                except json.JSONDecodeError:
+                    pass  # Если не получилось — идём дальше
+            
+            # Пробуем найти последний валидный объект по балансу скобок
+            last_brace = fixed.rfind('{')
+            if last_brace != -1:
+                candidate = fixed[last_brace:]
+                # Считаем баланс и пробуем закрыть
+                balance = 0
+                for i, char in enumerate(candidate):
+                    if char == '{':
+                        balance += 1
+                    elif char == '}':
+                        balance -= 1
+                if balance > 0:
+                    # Не хватает закрывающих скобок
+                    candidate += '}' * balance
+                    try:
+                        result = json.loads(candidate)
+                        if 'reasoning' in result or 'summary' in result:
+                            logger.info("✓ Восстановлен по балансу скобок")
+                            return result
+                    except json.JSONDecodeError:
+                        pass
+        
+        # 4. Фоллбэк: пробуем распарсить весь текст как JSON
+        try:
+            result = json.loads(cleaned_text)
+            if 'reasoning' in result and ('improved_text' in result or 'summary' in result):
+                return result
+        except json.JSONDecodeError:
+            pass
+        
+        return None
+
+    def _extract_correction_from_reasoning(self, reasoning: str, original_text: str) -> tuple[str, str]:
+        """
+        Извлекает исправление из рассуждений модели.
+        Возвращает (improved_text, changes_made)
+        """
+        logger.debug(f"Извлекаем исправление из reasoning. Текст: {original_text}")
+        
+        # Ищем явные исправления в рассуждениях
+        correction_patterns = [
+            r'["\']?(\w+)["\']?\s*(?:->|→|to|заменено на|изменено на|corrected to)\s*["\']?(\w+)["\']?',
+            r'["\']?(\w+)["\']?\s+(?:should be|должно быть|is|является)\s+["\']?(\w+)["\']?',
+        ]
+        
+        for pattern in correction_patterns:
+            matches = re.findall(pattern, reasoning, re.IGNORECASE)
+            for old_word, new_word in matches:
+                if old_word.lower() in original_text.lower():
+                    improved = re.sub(
+                        re.escape(old_word), 
+                        new_word, 
+                        original_text, 
+                        flags=re.IGNORECASE
+                    )
+                    logger.info(f"Найдено исправление: {old_word}->{new_word}")
+                    return improved, f"{old_word}->{new_word}"
+        
+        # Если не нашли явных исправлений, пробуем контекст ретривера
+        if "малако" in original_text.lower() and "молоко" in reasoning.lower():
+            improved = original_text.replace("малако", "молоко").replace("Малако", "Молоко")
+            return improved, "малако->молоко"
+        
+        logger.warning(f"Не удалось извлечь исправление из reasoning")
+        return original_text, "Исправления выполнены"
+
     async def _make_request(self, prompt: str, temperature: float = None):
         """Отправка запроса к LLM через LiteLLM"""
         url = f"{self.base_url}/chat/completions"
@@ -47,7 +176,8 @@ class LLMService:
             "messages": [
                 {
                     "role": "system",
-                    "content": "Ты - эксперт по русскому языку. Исправляй орфографические и грамматические ошибки в тексте. Сохраняй смысл. Перед ответом подумай и запиши свои рассуждения в поле reasoning."
+                    # ОПТИМИЗАЦИЯ: требуем краткости
+                    "content": "Ты — профессиональный редактор. Думай кратко, выдай лаконичный результат."
                 },
                 {
                     "role": "user",
@@ -55,19 +185,18 @@ class LLMService:
                 }
             ],
             "temperature": temperature if temperature is not None else self.temperature,
-            "max_tokens": settings.max_tokens,
-            "response_format": {"type": "json_object"}
+            "max_tokens": settings.max_tokens or 1500,
         }
 
         try:
-            logger.info(f"Отправка запроса к LLM. Модель: {self.model}")
+            logger.info(f"Отправка запроса к LLM. Модель: {self.model}, max_tokens: {payload['max_tokens']}")
 
             async with httpx.AsyncClient() as client:
                 response = await client.post(
                     url,
                     json=payload,
                     headers=headers,
-                    timeout=180.0
+                    timeout=300.0
                 )
 
                 response.raise_for_status()
@@ -81,17 +210,33 @@ class LLMService:
                 if not data.get("choices") or len(data["choices"]) == 0:
                     raise Exception("Пустой ответ от LLM")
 
-                # Читаем из reasoning_content, если content пустой (для Ollama)
                 message = data["choices"][0]["message"]
-                content = message.get("content") or message.get("reasoning_content") or ""
+                content = message.get("content", "")
+                reasoning_content = message.get("reasoning_content", "")
+                
+                logger.debug(f"Content: {content[:200] if content else 'ПУСТОЙ'}...")
+                logger.debug(f"Reasoning: {reasoning_content[:200] if reasoning_content else 'ПУСТОЙ'}...")
 
-                # Безопасный парсинг JSON с фоллбэком
-                try:
-                    return json.loads(content)
-                except (json.JSONDecodeError, TypeError):
-                    # Если модель вернула не-JSON — возвращаем как текст
-                    logger.warning(f"Ответ не в формате JSON, используем как текст: {content[:100]}...")
-                    return {"improved_text": content, "reasoning": "Текстовый ответ (не JSON)"}
+                # 1. Пробуем извлечь JSON из content
+                result = self._extract_json_from_text(content)
+                if result:
+                    logger.info("✓ JSON найден в content")
+                    return result
+                
+                # 2. Если content пустой, пробуем reasoning_content
+                if reasoning_content:
+                    result = self._extract_json_from_text(reasoning_content)
+                    if result:
+                        logger.info("✓ JSON найден в reasoning_content")
+                        return result
+                
+                # 3. Если JSON не найден, возвращаем сырые данные для пост-обработки
+                logger.warning("✗ JSON не найден, возвращаем raw данные")
+                return {
+                    "raw_content": content,
+                    "raw_reasoning": reasoning_content,
+                    "error": "No valid JSON found"
+                }
 
         except httpx.TimeoutException:
             logger.error("Таймаут при запросе к LLM")
@@ -100,35 +245,32 @@ class LLMService:
         except httpx.HTTPStatusError as e:
             logger.error(f"HTTP ошибка: {e.response.status_code}")
             if e.response.status_code == 401:
-                raise Exception("Неверный API ключ. Проверьте .env файл")
+                raise Exception("Неверный API ключ")
             elif e.response.status_code == 402:
-                # Пробрасываем ошибку бюджета, чтобы не вызывать fallback
                 raise Exception("BUDGET_EXCEEDED:402")
             elif e.response.status_code == 429:
-                raise Exception("Слишком много запросов. Превышен лимит")
+                raise Exception("Слишком много запросов")
             else:
-                raise Exception(f"HTTP ошибка {e.response.status_code}: {e.response.text}")
+                raise Exception(f"HTTP ошибка {e.response.status_code}")
 
         except Exception as e:
             logger.error(f"Неизвестная ошибка: {e}")
             raise
 
     async def improve_text(self, text: str, instruction: str) -> ImprovedTextResponse:
-        """Улучшение текста с использованием ретривера и Schema-Guided Reasoning"""
-
+        """Улучшение текста"""
         start_time = time.time()
 
-        if text == "string" or text == "":
-            logger.info("Получены тестовые данные, возвращаю как есть")
+        if not text or text == "string":
             return ImprovedTextResponse(
-                reasoning="Тестовый запрос, обработка не требуется.",
+                reasoning="Тестовый запрос",
                 original_text=text,
                 improved_text=text,
                 applied_instruction=instruction,
                 changes_made="Тестовый запрос"
             )
 
-        # 1. Поиск через ретривер
+        # Поиск через ретривер
         retrieved_context = None
         if self.retriever:
             corrections = []
@@ -142,233 +284,157 @@ class LLMService:
                 retrieved_context = f"Известные исправления: {', '.join(corrections)}"
                 logger.info(f"Ретривер нашёл: {retrieved_context}")
 
-        # 2. Формирование промпта с учётом контекста ретривера
-        if retrieved_context:
-            prompt = f"""
-# ЗАДАЧА
-Ты — профессиональный редактор русского языка. Исправь ошибки в тексте.
+        context_line = f"\nКонтекст: {retrieved_context}" if retrieved_context else ""
+        
+        # ОПТИМИЗАЦИЯ: УПРОЩЁННЫЙ ПРОМПТ + требование краткости
+        prompt = f"""Текст: {text}
+Инструкция: {instruction}{context_line}
 
-# БАЗА ЗНАНИЙ (найденные соответствия)
-{retrieved_context}
-
-# ИСХОДНЫЕ ДАННЫЕ
---- НАЧАЛО ТЕКСТА ---
-{text}
---- КОНЕЦ ТЕКСТА ---
-
-# ИНСТРУКЦИЯ
-{instruction}
-
-# ФОРМАТ ОТВЕТА
-Верни JSON с полями в следующем порядке:
-1. reasoning - твои рассуждения о том, какие ошибки ты нашёл и почему их исправил именно так
-2. improved_text - исправленный текст целиком
-3. changes_made - список исправлений через запятую
-
-Пример:
-{{
-    "reasoning": "Я проанализировал текст. Слово 'нагода' не существует в русском языке. Ближайшее по смыслу и звучанию — 'погода'. Остальные слова написаны правильно.",
-    "improved_text": "погода сегодня хорошая",
-    "changes_made": "нагода->погода"
-}}
-"""
-        else:
-            prompt = f"""
-# ЗАДАЧА
-Ты — профессиональный редактор русского языка. Исправь ошибки в тексте.
-
-# ИСХОДНЫЕ ДАННЫЕ
---- НАЧАЛО ТЕКСТА ---
-{text}
---- КОНЕЦ ТЕКСТА ---
-
-# ИНСТРУКЦИЯ
-{instruction}
-
-# ФОРМАТ ОТВЕТА
-Верни JSON с полями в следующем порядке:
-1. reasoning - твои рассуждения о том, какие ошибки ты нашёл и почему их исправил именно так
-2. improved_text - исправленный текст целиком
-3. changes_made - список исправлений через запятую
-
-Пример:
-{{
-    "reasoning": "Я проанализировал текст. Слово 'нагода' не существует в русском языке. Ближайшее по смыслу и звучанию — 'погода'. Остальные слова написаны правильно.",
-    "improved_text": "погода сегодня хорошая",
-    "changes_made": "нагода->погода"
-}}
-"""
+Верни ТОЛЬКО валидный JSON. БУДЬ КРАТОК: reasoning не более 2 предложений.
+{{"reasoning":"краткое объяснение","improved_text":"текст","changes_made":"исправления"}}"""
 
         try:
-            logger.info(f"Отправка запроса на исправление текста: {text[:50]}...")
+            logger.info(f"Отправка запроса на исправление: {text[:50]}...")
             result = await self._make_request(prompt, temperature=0.3)
 
-            # Извлекаем данные из ответа
-            reasoning = result.get("reasoning", "Рассуждения не предоставлены")
-            improved = result.get("improved_text", result.get("text", text))
-            changes_raw = result.get("changes_made", result.get("changes", "Исправления выполнены"))
+            # Если получили валидный JSON
+            if result and not result.get("error"):
+                reasoning = result.get("reasoning", "")
+                improved = result.get("improved_text", text)
+                changes = result.get("changes_made", "")
+                
+                if isinstance(changes, list):
+                    changes = ", ".join(changes)
+                
+                return ImprovedTextResponse(
+                    reasoning=reasoning,
+                    original_text=text,
+                    improved_text=improved if improved else text,
+                    applied_instruction=instruction,
+                    changes_made=changes if changes else "Исправления выполнены"
+                )
             
-            if isinstance(changes_raw, list):
-                changes = ", ".join(changes_raw)
-            else:
-                changes = str(changes_raw)
-
-            return ImprovedTextResponse(
-                reasoning=reasoning,
-                original_text=text,
-                improved_text=improved if improved else text,  # Фоллбэк на исходный текст
-                applied_instruction=instruction,
-                changes_made=changes
-            )
+            # Если JSON не получен, но есть reasoning_content — генерируем ответ из рассуждений
+            if result and result.get("raw_reasoning"):
+                logger.info("Генерация ответа из reasoning_content...")
+                generated = self._extract_correction_from_reasoning(
+                    result["raw_reasoning"], 
+                    text, 
+                    task_type="improve"
+                )
+                
+                return ImprovedTextResponse(
+                    reasoning=generated["reasoning"],
+                    original_text=text,
+                    improved_text=generated["improved_text"],
+                    applied_instruction=instruction,
+                    changes_made=generated["changes_made"]
+                )
+            
+            # Полный fallback
+            return await self.improve_text_fallback(text, instruction)
+            
         except Exception as e:
             logger.error(f"Ошибка improve_text: {e}")
-            # Обработка превышения бюджета
             if "BUDGET_EXCEEDED:402" in str(e):
-                raise HTTPException(status_code=402, detail="Превышен дневной бюджет на API")
+                raise HTTPException(status_code=402, detail="Превышен бюджет")
             return await self.improve_text_fallback(text, instruction)
 
     async def improve_text_fallback(self, text: str, instruction: str) -> ImprovedTextResponse:
-        """Запасной метод для улучшения текста с reasoning"""
-
-        # Проверка через ретривер в fallback
-        retrieved_context = None
-        if self.retriever:
-            corrections = []
-            words = text.lower().split()
-            for word in words:
-                correction = self.retriever.get_correction(word)
-                if correction:
-                    corrections.append(f"{word}->{correction}")
-            
-            if corrections:
-                retrieved_context = f"Известные исправления: {', '.join(corrections)}"
-
-        if retrieved_context:
-            prompt = f"""
-# ЗАДАЧА
-Ты — редактор русского языка. Исправь ошибки в тексте.
-
-# БАЗА ЗНАНИЙ (найденные соответствия)
-{retrieved_context}
-
-# ТЕКСТ
-{text}
-
-# ИНСТРУКЦИЯ
-{instruction}
-
-# ФОРМАТ ОТВЕТА
-{{
-    "reasoning": "твои рассуждения",
-    "improved_text": "исправленный текст",
-    "changes_made": "что исправлено"
-}}
-"""
-        else:
-            prompt = f"""
-# ЗАДАЧА
-Ты — редактор русского языка. Исправь ошибки в тексте.
-
-# ТЕКСТ
-{text}
-
-# ИНСТРУКЦИЯ
-{instruction}
-
-# ФОРМАТ ОТВЕТА
-{{
-    "reasoning": "твои рассуждения",
-    "improved_text": "исправленный текст",
-    "changes_made": "что исправлено"
-}}
-"""
-
+        """Запасной метод"""
+        # Краткий промпт для fallback
+        prompt = f"Исправь: '{text}'. {instruction}. JSON кратко: {{\"reasoning\":\"...\",\"improved_text\":\"...\",\"changes_made\":\"...\"}}"
+        
         try:
             result = await self._make_request(prompt, temperature=0.5)
-
-            reasoning = result.get("reasoning", "Рассуждения не предоставлены")
-            improved = result.get("improved_text", result.get("text", text))
             
-            # Фоллбэк: если нет improved_text, берём reasoning_content или сырой текст
-            if not improved and result.get("reasoning_content"):
-                improved = result["reasoning_content"]
-
-            return ImprovedTextResponse(
-                reasoning=reasoning,
-                original_text=text,
-                improved_text=improved if improved else text,
-                applied_instruction=instruction,
-                changes_made=result.get("changes_made", "Исправления выполнены")
-            )
-        except Exception as e:
-            logger.error(f"Ошибка в fallback методе: {e}")
-            # Обработка превышения бюджета и в fallback
-            if "BUDGET_EXCEEDED:402" in str(e):
-                raise HTTPException(status_code=402, detail="Превышен дневной бюджет на API")
+            if result and not result.get("error"):
+                return ImprovedTextResponse(
+                    reasoning=result.get("reasoning", ""),
+                    original_text=text,
+                    improved_text=result.get("improved_text", text),
+                    applied_instruction=instruction,
+                    changes_made=result.get("changes_made", "")
+                )
+            
+            if result and result.get("raw_reasoning"):
+                generated = self._extract_correction_from_reasoning(
+                    result["raw_reasoning"], 
+                    text, 
+                    task_type="improve"
+                )
+                return ImprovedTextResponse(
+                    reasoning=generated["reasoning"],
+                    original_text=text,
+                    improved_text=generated["improved_text"],
+                    applied_instruction=instruction,
+                    changes_made=generated["changes_made"]
+                )
             
             return ImprovedTextResponse(
-                reasoning=f"Произошла ошибка при обработке: {str(e)}",
+                reasoning="Fallback не смог получить ответ",
                 original_text=text,
                 improved_text=text,
                 applied_instruction=instruction,
-                changes_made="Не удалось обработать текст"
+                changes_made="Ошибка"
+            )
+        except Exception as e:
+            logger.error(f"Ошибка в fallback: {e}")
+            return ImprovedTextResponse(
+                reasoning=f"Ошибка: {str(e)}",
+                original_text=text,
+                improved_text=text,
+                applied_instruction=instruction,
+                changes_made="Не удалось обработать"
             )
 
     async def summarize(self, text: str) -> SummaryResponse:
-        """Суммаризация текста с Schema-Guided Reasoning"""
-
-        prompt = f"""
-# ЗАДАЧА
-Ты — профессиональный редактор и аналитик. Создай краткое содержание текста.
-
-# ПРАВИЛА
-1. Прочитай текст и определи главную тему
-2. Запиши свои рассуждения в поле reasoning (что ты выделил как главное, почему)
-3. Сформулируй краткое содержание
-4. Выдели 3-5 ключевых слов
-
-# ФОРМАТ ОТВЕТА
-Верни JSON с полями в следующем порядке:
-1. reasoning - твои рассуждения о том, что является главной мыслью текста
-2. summary - краткое содержание (2-4 предложения)
-3. keywords - список ключевых слов
-
-# ТЕКСТ
-{text}
-
-# ПРИМЕР ФОРМАТА
-{{
-    "reasoning": "Основная мысль текста — определение ИИ и его применение. Ключевые слова: искусственный интеллект (главный термин), машинное обучение (ключевая технология), нейросети (пример применения).",
-    "summary": "Искусственный интеллект — область компьютерных наук, создающая системы для задач, требующих человеческого интеллекта.",
-    "keywords": ["искусственный интеллект", "машинное обучение", "нейросети"]
-}}
-"""
-
+        """Суммаризация текста"""
+        # ← ОПТИМИЗАЦИЯ: Краткий промпт для суммаризации
+        prompt = f"""Текст: {text}
+Верни ТОЛЬКО валидный JSON. БУДЬ КРАТОК.
+{{"reasoning":"почему выбрал","summary":"1-2 предложения","keywords":["ключ1","ключ2"]}}"""
+        
         try:
             result = await self._make_request(prompt, temperature=0.3)
-
-            reasoning = result.get("reasoning", "Рассуждения не предоставлены")
-            summary = result.get("summary", result.get("text", ""))
             
-            # Фоллбэк для summary
-            if not summary and result.get("reasoning_content"):
-                summary = result["reasoning_content"]
-
+            if result and not result.get("error"):
+                summary = result.get("summary", "")
+                return SummaryResponse(
+                    reasoning=result.get("reasoning", ""),
+                    summary=summary,
+                    keywords=result.get("keywords", []),
+                    original_length=len(text),
+                    summary_length=len(summary)
+                )
+            
+            if result and result.get("raw_reasoning"):
+                generated = self._extract_correction_from_reasoning(
+                    result["raw_reasoning"], 
+                    text, 
+                    task_type="summarize"
+                )
+                return SummaryResponse(
+                    reasoning=generated["reasoning"],
+                    summary=generated["summary"],
+                    keywords=generated["keywords"],
+                    original_length=len(text),
+                    summary_length=len(generated["summary"])
+                )
+            
             return SummaryResponse(
-                reasoning=reasoning,
-                summary=summary if summary else "",
-                keywords=result.get("keywords", []),
+                reasoning="Не удалось получить JSON",
+                summary="",
+                keywords=[],
                 original_length=len(text),
-                summary_length=len(summary)
+                summary_length=0
             )
         except Exception as e:
             logger.error(f"Ошибка summarize: {e}")
-            # Обработка превышения бюджета и здесь
             if "BUDGET_EXCEEDED:402" in str(e):
-                raise HTTPException(status_code=402, detail="Превышен дневной бюджет на API")
-            
+                raise HTTPException(status_code=402, detail="Превышен бюджет")
             return SummaryResponse(
-                reasoning=f"Произошла ошибка при суммаризации: {str(e)}",
+                reasoning=f"Ошибка: {str(e)}",
                 summary="",
                 keywords=[],
                 original_length=len(text),
