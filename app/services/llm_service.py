@@ -196,7 +196,7 @@ class LLMService:
                     url,
                     json=payload,
                     headers=headers,
-                    timeout=300.0
+                    timeout=600.0
                 )
 
                 response.raise_for_status()

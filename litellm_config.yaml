@@ -19,7 +19,3 @@ general_settings:
 litellm_settings:
   callbacks: ["langfuse"]
   langfuse_host: "http://langfuse:3000"
-  langfuse_public_key: "pk-lf-..."
-  langfuse_secret_key: "sk-lf-..."
-
-  
